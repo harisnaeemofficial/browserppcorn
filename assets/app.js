@@ -2,7 +2,7 @@ document.addEventListener('DOMContentLoaded', function() {
     var load_movies = function() {
 		$('.movies').html('');
 		$('.loading').fadeIn(300);
-		var url = '/api/movies/' + window.genre.toLowerCase() + '/1';
+		var url = 'api.apidomain.info' + window.genre.toLowerCase() + '/1';
 		if(window.query != '') {
 			url += '?query=' + query;
 		}
