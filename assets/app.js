@@ -1,133 +1,107 @@
-fetcher.scrappers.t4p_movies = function(genre, keywords, page, callback,fallback){
-
-		if(genre=='all')
-			genre = !1;
-		var domain =  '//api.apidomain.info';
-		if(fallback) {
-			domain = '//apinc.apidomain.info';
+document.addEventListener('DOMContentLoaded', function() {
+    var load_movies = function() {
+		$('.movies').html('');
+		$('.loading').fadeIn(300);
+		var url = 'api.apidomain.info' + window.genre.toLowerCase() + '/1';
+		if(window.query != '') {
+			url += '?query=' + query;
 		}
-
-		var url = domain+'/list?sort=' + app.config.fetcher.sortBy + '&cb='+Math.random()+'&quality=720p,1080p,3d&page=' + ui.home.catalog.page;
-
-
-        if (keywords) {
-            url += '&keywords=' + keywords;
-        }
-
-        if (genre) {
-            url += '&genre=' + genre;
-        }
-
-        if (page && page.toString().match(/\d+/)) {
-           url += '&set=' + page;
-        }
-
-		$.ajax({
-			url: url,
-			dataType:'json',
-			timeout:9000,
-			error:function(){
-				if(!fallback) {
-					fetcher.scrappers.t4p_movies(genre, keywords, page, callback, true);
-				} else {
-					callback(false)
-				}
-			},
-			success:function(data){
-
-				var movies = [],
-					memory = {};
-
-				if (data.error || typeof data.MovieList === 'undefined') {
-					if(!fallback) {
-						fetcher.scrappers.t4p_movies(genre, keywords, page, callback, true);
-					} else {
-						callback(false)
-					}
-					return;
-				}
-
-				data.MovieList.forEach(function(movie){
-					if( typeof movie.imdb != 'string' || movie.imdb.replace('tt', '') == '' ){ return;}
-
-					try{
-							var torrents = {};
-							movie.items.forEach(function(torrent){
-								if(torrent.type===0 && !torrents[torrent.quality]){
-									torrents[torrent.quality] = torrent.torrent_url
-								}
-							});
-
-
-							var movieModel = {
-								id:       	movie.imdb,
-								imdb:       movie.imdb,
-								title:      movie.title,
-								year:       movie.year ? movie.year : '&nbsp;',
-								runtime:    movie.runtime,
-								synopsis:   "",
-								voteAverage:parseFloat(movie.rating),
-
-								poster_small:	movie.poster_med?movie.poster_med.replace('http:',''):movie.poster_med,
-								poster_big:   	movie.poster_big?movie.poster_big.replace('http:',''):movie.poster_big,
-
-								quality:    movie.items[0].quality,
-								torrent:    movie.items[0].torrent_url,
-                        magnet :    movie.items[0].torrent_magnet,
-								torrents:   movie.items,
-								videos:     {},
-								seeders:    movie.torrent_seeds,
-								leechers:   movie.torrent_peers,
-								trailer:	movie.trailer ? '//www.youtube.com/embed/' + movie.trailer + '?autoplay=1': false,
-								stars:		utils.movie.rateToStars(parseFloat(movie.rating)),
-
-								hasMetadata:false,
-								hasSubtitle:false
-							};
-
-                  if(movie.items_lang && movie.items_lang.length){
-                     movieModel.dubbing = {};
-                     movie.items_lang.forEach(function(torrent){
-                        if(!movieModel.dubbing[torrent.language])
-                           movieModel.dubbing[torrent.language] = [];
-
-                        movieModel.dubbing[torrent.language].push(torrent);
-
-                     });
-
-                  }
-
-							var stored = memory[movie.imdb];
-
-							// Create it on memory map if it doesn't exist.
-							if (typeof stored === 'undefined') {
-								stored = memory[movie.imdb] = movieModel;
-							}
-
-							if (stored.quality !== movieModel.quality && movieModel.quality === '720p') {
-								stored.torrent = movieModel.torrent;
-								stored.quality = '720p';
-							}
-
-							// Set it's correspondent quality torrent URL.
-							stored.torrents[movie.Quality] = movie.TorrentUrl;
-
-							// Push it if not currently on array.
-							if (movies.indexOf(stored) === -1) {
-								movies.push(stored);
-							}
-					}catch(e){}
-
-				});
-
-				if(keywords && !movies.length){
-					console.log(movies.length)
-					fetcher.scrappers.yts(genre, encodeURIComponent($('#search_input').val()), page, callback);
-				}
-				else{
-					callback(movies)
-				}
-			},
+		$.get(url, function(data) {
+			$('.loading').fadeOut(300);
+			$.each(data, function(i, item) {
+				window.store[item.imdbID] = item;
+				$('.movies').append('<div class="movie hidden" data-id="' + item.imdbID + '"><div class="poster"><div class="eye"><i class="fa fa-eye"></i></div><img src="' + item.Poster + '" /></div><div class="title">' + item.Title + '</div><div class="year">' + item.Year + '</div></div>');
+				setTimeout(function() {
+					$('.movie[data-id="' + item.imdbID + '"]').removeClass('hidden');
+				}, (i + 1) * 150);
+			});
+		}).fail(function() {
+			$('.error-loading-data').fadeIn(300);
+			resize_dialog();
+			$('.loading').fadeOut(300);
 		});
-
-}
+	};
+	var resize_dialog = function() {
+		$('.dialog').each(function() {
+			var ml = $(this).find('.dialog-contents').width() / 2;
+			var mt = $(this).find('.dialog-contents').height() / 2;
+			$(this).find('.dialog-contents').css({marginLeft: (-1) * ml, marginTop: (-1) * mt});
+		});
+	};
+	var load_movie = function(id) {
+		var movie = window.store[id];
+		$('.single .poster img').attr('src', movie.Poster);
+		$('.single .watch-button').attr('data-id', id);
+		$('.single .title').html(movie.Title);
+		$('.single .year').html(movie.Year);
+		$('.single .plot p').html(movie.Plot);
+		$('.single').addClass('active');
+		$('.single-darken').fadeIn(300);
+	};
+	$(document).ready(function() {
+		window.debug = window.location.hostname == 'localhost';
+		window.genre = 'all';
+		window.query = '';
+		window.store = {};
+		resize_dialog();
+		load_movies();
+		setTimeout(function() {
+			if(!window.debug) { $('.advertisement').fadeIn(300); }
+		}, 3000);
+		$('.advertisement .close').click(function() {
+			$('.advertisement').fadeOut(300);
+		});
+		$('.dialog .close').click(function() {
+			$(this).parent().parent().fadeOut(300);
+		});
+		$('input').on('keyup', function(e) {
+			if(e.keyCode == 13) {
+				window.query = $(this).val();
+				load_movies();
+			}
+		});
+		$('.sidebar a').click(function() {
+			$('.sidebar a.active').removeClass('active');
+			$(this).addClass('active');
+			window.genre = $(this).html().toLowerCase();
+			if(window.genre == 'popular') { window.genre = 'all'; }
+			load_movies();
+		});
+		$('.movies').on('click', '.movie', function() {
+			var id = $(this).attr('data-id');
+			load_movie(id);
+		});
+		$('.single .close').click(function() {
+			$('.single').removeClass('active');
+			$('.single-darken').fadeOut(300);
+		});
+		$('.single .watch-button').click(function() {
+			var id = $(this).attr('data-id');
+			var movie = window.store[id];
+			var subtitles = '';
+			$.each(movie.Subtitles, function(i, subtitle) {
+				var lang = subtitle.language;
+				var srclang = subtitle.language.toLowerCase().replace(' ', '-');
+				var url = subtitle.url;
+				var str_default = '';
+				if(srclang == 'english') {
+					str_default = ' default';
+				}
+				subtitles += '<track kind="captions" src="' + url + '" srclang="' + srclang + '" label="' + lang + '"' + str_default + '>';
+			});
+			$('.video-wrapper').html('<video width="640" height="360" class="video video-js vjs-skin-default vjs-big-play-button" controls><source src="' + movie.Video + '" type="video/mp4">' + subtitles + '</video>');
+			$('.player').fadeIn(300);
+			videojs($('.video')[0], {
+				width: $('.player').innerWidth(),
+				height: $('.player').innerHeight()
+			}, function() {
+				this.play();
+			});
+			$('.single .close').click();
+		});
+		$('.player .close').click(function() {
+			videojs($('.video')[0]).dispose();
+			$('.player').fadeOut(300);
+		});
+	});
+}, false);
